@@ -1,212 +1,120 @@
-A full Survey Analysis System that draws survey data that is in this form and creates a structured representation stored on an AWS server, then performs analytics on it, incorporating snowflake and apache spark, and does visualization using Tableau. 
+# Survey Analysis System
+
+An end-to-end analytics workflow that captures Best Buy customer experience surveys, stores them on AWS, analyzes results with Apache Spark and Snowflake, and prepares curated datasets for Tableau dashboards.
+
+## Features
+
+- **Structured data model** for the multi-section survey, including screener, discovery, service, pricing, fulfillment, loyalty, and demographic components.
+- **Ingestion pipeline** that normalizes raw survey payloads into a consistent schema.
+- **AWS-ready storage layer** with pluggable backends for S3 or local JSON persistence.
+- **Analytics module** that runs channel-level KPIs in Apache Spark with a Python fallback when Spark is unavailable.
+- **Snowflake loader** that creates and populates analytical tables via the Snowflake Python connector.
+- **Tableau integration helpers** that export curated datasets as CSV files and optionally publish to Tableau Server.
+- **Command-line script** demonstrating how to stitch ingestion, storage, analytics, and Tableau export together.
+
+## Repository Structure
+
+```
+SurveyAnalysisTest/
+├── survey_analysis/
+│   ├── __init__.py
+│   ├── analytics.py
+│   ├── ingestion.py
+│   ├── models.py
+│   ├── pipelines.py
+│   ├── snowflake_loader.py
+│   ├── storage.py
+│   └── tableau.py
+├── scripts/
+│   └── run_pipeline.py
+├── tests/
+│   └── test_ingestion.py
+├── pyproject.toml
+└── Readme.txt
+```
+
+## Getting Started
+
+1. **Install dependencies** (base plus optional extras as needed):
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -e .[aws,spark,snowflake,tableau]
+   ```
+
+2. **Prepare survey payloads** as JSON files. Each file should match the keys in the survey form (see `tests/test_ingestion.py` for an example payload).
+
+3. **Run the pipeline** to ingest and analyze data locally:
+
+   ```bash
+   python scripts/run_pipeline.py data/sample_payloads --output-directory data/exported --tableau-output data/tableau/survey_responses.csv
+   ```
+
+   The script will:
+
+   - Normalize all responses and store them via the configured backend (defaults to local JSON files).
+   - Produce channel-level KPI summaries using Spark if available.
+   - Generate a Tableau-ready CSV export.
+
+4. **Load data into Snowflake** (optional):
+
+   ```python
+   from survey_analysis.snowflake_loader import SnowflakeSurveyLoader
+   loader = SnowflakeSurveyLoader({
+       "user": "YOUR_USER",
+       "password": "YOUR_PASSWORD",
+       "account": "YOUR_ACCOUNT",
+       "warehouse": "ANALYTICS_WH",
+       "database": "CUSTOMER_INSIGHTS",
+       "schema": "SURVEYS",
+   })
+   loader.create_table_if_needed()
+   loader.load_records(records)
+   ```
+
+5. **Publish to Tableau** (optional):
+
+   ```python
+   from pathlib import Path
+   from survey_analysis.tableau import publish_to_tableau_server
+
+   publish_to_tableau_server(
+       csv_path=Path("data/tableau/survey_responses.csv"),
+       project="Customer Insights",
+       datasource_name="Best Buy Survey",
+       server_url="https://tableau.yourcompany.com",
+       site_id="bestbuy",
+       token_name="TABLEAU_TOKEN_NAME",
+       token_secret="TABLEAU_TOKEN_SECRET",
+   )
+   ```
+
+## Data Model Highlights
+
+- **`SurveyResponse` dataclass** encapsulates all sections of the survey and exposes a `to_record()` method for flattening data into analytics-friendly dictionaries.
+- **Normalization helpers** ensure choice lists and dates are standardized for storage and analytics.
+
+## Testing
+
+Run unit tests with `pytest`:
+
+```bash
+pytest
+```
 
+## Extending the System
 
-Customer Experience Survey (In-Store + Online)
-1) Screener & Visit Context
+- Add new derived metrics by extending `survey_analysis/analytics.py`.
+- Plug in alternate storage backends by implementing the `StorageBackend` protocol in `survey_analysis/storage.py`.
+- Customize Tableau exports by modifying `survey_analysis/tableau.py` or generating Hyper extracts via the Tableau Hyper API.
 
-Which of these did you do most recently at Best Buy?
+## Security & Operations
 
-☐ Visited a store
+- Store AWS, Snowflake, and Tableau credentials in secure secret managers such as AWS Secrets Manager or HashiCorp Vault.
+- Enable encryption at rest for S3 buckets and Snowflake tables.
+- Use CI/CD pipelines to lint, test, and deploy analytics updates.
 
-☐ Shopped online at BestBuy.com / app
+## License
 
-☐ Both (researched online, purchased in store)
-Example: ☑ Both
-
-About when was this visit/order?
-
-☐ Today ☐ Yesterday ☐ 2–3 days ago ☐ 4–7 days ago ☐ 1–2 weeks ago ☐ 2+ weeks ago
-Example: ☑ 2–3 days ago
-
-Which location (store or ZIP) or order number? (free text)
-Example: “Louisville, KY (Shelbyville Rd) — Order #BBY01-7421938472”
-
-What did you shop for? (select all)
-
-☐ TV / Home theater
-
-☐ Computers / Tablets
-
-☐ Phones / Wearables
-
-☐ Appliances
-
-☐ Gaming
-
-☐ Audio (speakers, headphones)
-
-☐ Smart home / Networking
-
-☐ Cables / Accessories
-Example: ☑ Computers/Tablets, ☑ Cables/Accessories
-
-2) Discovery & Availability
-
-Were you able to find the product(s) you wanted?
-
-☐ Yes, exactly ☐ Yes, close alternative ☐ Partially ☐ No
-Example: ☑ Yes, exactly
-
-If you didn’t find it, why not? (skip if “Yes, exactly”)
-
-☐ Out of stock ☐ Couldn’t locate it ☐ Not carried ☐ Price higher than expected ☐ Other (free text)
-
-Rate the ease of finding products (signage, layout, search filters).
-
-1 Very difficult — 5 Very easy
-Example: 4/5
-
-Product information was clear (specs, compatibility, reviews, demos).
-
-1 Strongly disagree — 5 Strongly agree
-Example: 5/5
-
-3) Staff & Service (store or chat/phone)
-
-Did you interact with a Blue Shirt associate or Geek Squad/online agent?
-
-☐ Yes ☐ No
-Example: ☑ Yes
-
-The associate was knowledgeable and helpful.
-
-1 Strongly disagree — 5 Strongly agree
-Example: 5/5
-
-I felt no pressure to buy.
-
-1 Strongly disagree — 5 Strongly agree
-Example: 4/5
-
-Wait time for help was reasonable.
-
-1 Strongly disagree — 5 Strongly agree
-Example: 4/5
-
-4) Pricing, Promos, & Membership
-
-Prices met my expectations for value.
-
-1 Strongly disagree — 5 Strongly agree
-Example: 4/5
-
-I noticed or used any of these (select all):
-
-☐ Sale/clearance price
-
-☐ Open-box option
-
-☐ Price match
-
-☐ My Best Buy membership benefits
-
-☐ Financing
-Example: ☑ Sale price, ☑ My Best Buy benefits
-
-How satisfied are you with the overall value for money?
-
-1 Very dissatisfied — 5 Very satisfied
-Example: 4/5
-
-5) Checkout & Fulfillment
-
-(Show in-store or online follow-ups based on Q1)
-
-In-store
-16a. Checkout was fast and straightforward.
-
-1 Strongly disagree — 5 Strongly agree
-Example: 5/5
-
-17a. Payment options (cards, tap-to-pay, financing) met my needs.
-
-1 Strongly disagree — 5 Strongly agree
-Example: 5/5
-
-Online
-16b. The site/app was fast and the cart was easy to edit.
-
-1 Strongly disagree — 5 Strongly agree
-
-17b. Which fulfillment did you use?
-
-☐ Ship to home ☐ Same-day delivery ☐ Store pickup (BOPIS)
-Example: ☑ Store pickup
-
-If pickup or delivery: It was ready/on time and easy to get.
-
-1 Strongly disagree — 5 Strongly agree
-Example: 5/5
-
-6) Services (Optional)
-
-Did you purchase or consider any services? (select all)
-
-☐ Geek Squad Protection ☐ Setup/Installation ☐ Trade-In ☐ Device recycling
-Example: ☑ Geek Squad Protection
-
-Rate your satisfaction with the service you used.
-
-1 Very dissatisfied — 5 Very satisfied
-Example: 5/5
-
-7) Problem Resolution (if applicable)
-
-Did anything go wrong?
-
-☐ No ☐ Yes (describe)
-Example: ☑ No
-
-If yes: How easy was it to resolve the issue?
-
-1 Very difficult — 5 Very easy
-
-8) Outcome & Loyalty
-
-Overall satisfaction with your experience today (CSAT).
-
-1 Very dissatisfied — 5 Very satisfied
-Example: 5/5
-
-How easy was it to accomplish your goal? (Customer Effort Score)
-
-1 Very difficult — 7 Very easy
-Example: 6/7
-
-How likely are you to recommend Best Buy to a friend or colleague? (NPS)
-
-0 Not at all likely — 10 Extremely likely
-Example: 9/10
-
-How likely are you to shop at Best Buy again in the next 3 months?
-
-☐ Very unlikely ☐ Unlikely ☐ Neutral ☐ Likely ☐ Very likely
-Example: ☑ Very likely
-
-9) Open-Ended
-
-What worked especially well? (free text)
-Example: “Associate quickly confirmed RAM compatibility; pickup was ready 20 minutes early.”
-
-What could we improve? (free text)
-Example: “Cable wall was a bit messy—grouping by connector type would help.”
-
-Anything else you’d like us to know? (free text)
-Example: “Would love more side-by-side laptop display models with identical lighting.”
-
-10) Demographics (Optional)
-
-Age range:
-
-☐ Under 18 ☐ 18–24 ☐ 25–34 ☐ 35–44 ☐ 45–54 ☐ 55–64 ☐ 65+
-Example: ☑ 35–44
-
-Tech comfort level:
-
-☐ Beginner ☐ Intermediate ☐ Advanced ☐ Expert
-Example: ☑ Advanced
-
-Household role in tech purchases:
-
-☐ Primary decision-maker ☐ Shared ☐ Not primary
-Example: ☑ Primary
+This repository is provided as a reference architecture; customize licensing according to your organization's policies.

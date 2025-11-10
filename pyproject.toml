@@ -1,0 +1,16 @@
+[project]
+name = "survey-analysis-system"
+version = "0.1.0"
+description = "End-to-end pipeline for Best Buy survey analytics"
+requires-python = ">=3.10"
+authors = [{name = "Best Buy Insights"}]
+readme = "Readme.txt"
+
+[project.optional-dependencies]
+aws = ["boto3>=1.28"]
+spark = ["pyspark>=3.4"]
+snowflake = ["snowflake-connector-python>=3.0", "pandas>=2.0"]
+tableau = ["tableauserverclient>=0.24", "pandas>=2.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
