@@ -121,7 +121,7 @@ class SurveyResponse:
     def to_record(self) -> dict:
         """Flatten the response into a dictionary suitable for analytics."""
 
-        return {
+        record = {
             "channel": self.screener_visit.channel,
             "visit_date": self.screener_visit.visit_date.isoformat()
             if self.screener_visit.visit_date
@@ -160,5 +160,23 @@ class SurveyResponse:
             "age_range": self.demographics.age_range,
             "tech_comfort_level": self.demographics.tech_comfort_level,
             "household_role": self.demographics.household_role,
-            **self.raw_metadata,
         }
+        record.update(_serialise_metadata(self.raw_metadata))
+        return record
+
+
+def _serialise_metadata(metadata: dict) -> dict:
+    """Normalise metadata values for Spark compatibility."""
+
+    import json
+
+    normalised = {}
+    for key, value in metadata.items():
+        if value is None or isinstance(value, (str, int, float, bool)):
+            normalised[key] = value
+        else:
+            try:
+                normalised[key] = json.dumps(value, sort_keys=True)
+            except (TypeError, ValueError):
+                normalised[key] = str(value)
+    return normalised
