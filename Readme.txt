@@ -11,6 +11,7 @@ An end-to-end analytics workflow that captures Best Buy customer experience surv
 - **Snowflake loader** that creates and populates analytical tables via the Snowflake Python connector.
 - **Tableau integration helpers** that export curated datasets as CSV files and optionally publish to Tableau Server.
 - **Command-line script** demonstrating how to stitch ingestion, storage, analytics, and Tableau export together.
+- **Interactive landing page** (`web/index.html`) for dragging-and-dropping survey JSON to preview channel KPIs before running the Spark pipeline.
 
 ## Repository Structure
 
@@ -45,7 +46,11 @@ SurveyAnalysisTest/
 
 2. **Prepare survey payloads** as JSON files. Each file should match the keys in the survey form (see `tests/test_ingestion.py` for an example payload).
 
-3. **Run the pipeline** to ingest and analyze data locally:
+3. **(Optional) Validate data visually**
+
+   Open `web/index.html` in a browser to access the landing page. Drag your `surveys.json` file into the drop zone to preview CSAT, CES, NPS, and problem counts per channel without leaving your machine. This is a quick sanity check before firing up Spark.
+
+4. **Run the pipeline** to ingest and analyze data locally:
 
    ```bash
    python scripts/run_pipeline.py data/sample_payloads --output-directory data/exported --tableau-output data/tableau/survey_responses.csv
@@ -57,7 +62,7 @@ SurveyAnalysisTest/
    - Produce channel-level KPI summaries using Spark if available.
    - Generate a Tableau-ready CSV export.
 
-4. **Load data into Snowflake** (optional):
+5. **Load data into Snowflake** (optional):
 
    ```python
    from survey_analysis.snowflake_loader import SnowflakeSurveyLoader
@@ -73,7 +78,7 @@ SurveyAnalysisTest/
    loader.load_records(records)
    ```
 
-5. **Publish to Tableau** (optional):
+6. **Publish to Tableau** (optional):
 
    ```python
    from pathlib import Path
